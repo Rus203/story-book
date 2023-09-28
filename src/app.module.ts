@@ -1,12 +1,8 @@
 import { Module } from '@nestjs/common';
-import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ConfigModule } from '@nestjs/config';
 import { DataBaseModule } from './database/database.module';
-import { AuthModule } from './auth/auth.module';
 import * as Joi from 'joi';
-import { UserModule } from './user/user.module';
-import { PlaceModule } from './place/place.module';
 
 @Module({
   imports: [
@@ -27,11 +23,9 @@ import { PlaceModule } from './place/place.module';
       }),
     }),
     DataBaseModule,
-    UserModule,
     AuthModule,
-    PlaceModule,
   ],
-  controllers: [AppController],
+  controllers: [],
   providers: [AppService],
 })
 export class AppModule {}
