@@ -1,28 +1,17 @@
-import {
-  BadRequestException,
-  Injectable,
-  InternalServerErrorException,
-} from '@nestjs/common';
-import { UserRepository } from './user.repository';
+import { Injectable } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
-import { FilterQuery, Types } from 'mongoose';
-import * as fs from 'fs';
-import * as path from 'path';
+import { FilterQuery } from 'mongoose';
 import { ConfigService } from '@nestjs/config';
-import { promisify } from 'util';
+import { ImageService } from 'src/image/image.service';
 import { User } from './user.schema';
-
-const asyncWriteFile = promisify(fs.writeFile);
-const asyncUnlink = promisify(fs.unlink);
-
-const base64Regex = /^data:image\/\w+;base64,/;
-const dataURLRegex = /^data:image\/(jpeg|jpg|png);base64,/;
+import { UserRepository } from './user.repository';
 
 @Injectable()
 export class UserService {
   constructor(
     private userRepository: UserRepository,
-    private configService: ConfigService
+    private configService: ConfigService,
+    private imageService: ImageService
   ) {}
 
   async addUser(phoneNumber: string, password: string) {
@@ -34,57 +23,71 @@ export class UserService {
     });
   }
 
-  async getUsers(filterQuery?: FilterQuery<User>) {
+  async getUsersByParams(filterQuery?: FilterQuery<User>, needImg = false) {
     const excepted = {
-      isActive: 0,
-      password: 0,
-      refreshToken: 0,
-
-      images: { $elemMatch: { isActive: false } },
+      password: false,
+      refreshToken: false,
     };
-    const users = await this.userRepository.find(
-      { ...filterQuery, isActive: true },
-      excepted
+
+    const users = await this.userRepository.find(filterQuery, excepted);
+
+    return Promise.all(
+      users.map(async (user) => {
+        const { avatarId, ...data } = user;
+        const avatar = await this.imageService.getImagesByParams({
+          ownerId: data._id,
+          _id: avatarId,
+        });
+
+        let images = undefined;
+
+        if (needImg) {
+          console.log('add img');
+          images = await this.imageService.getImagesByParams({
+            ownerId: data._id,
+          });
+        }
+
+        return { ...data, avatar: avatar[0], images };
+      })
     );
-
-    return users?.map((user) => {
-      const { images, ...data } = user;
-      const filteredMetaData = images?.map((item) => {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { isActive, ...other } = item;
-        return other;
-      });
-
-      return { ...data, images: filteredMetaData };
-    });
   }
 
-  async getOneUserByParams(filterQuery: Partial<User>) {
+  async getOneUserByParams(
+    filterQuery: Partial<User>,
+    projection?: Record<string, unknown>,
+    needImg = false
+  ) {
     const excepted = {
-      isActive: 0,
-      password: 0,
-      refreshToken: 0,
-      images: { $elemMatch: { isActive: false } },
+      ...projection,
+      password: false,
+      refreshToken: false,
     };
+
     const user = await this.userRepository.findOne(filterQuery, excepted);
 
-    const { images, ...data } = user;
+    const { avatarId, ...data } = user;
 
-    const filteredMetaData = images?.map((item) => {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { isActive, ...other } = item;
-      return other;
+    const avatar = await this.imageService.getImagesByParams({
+      ownerId: data._id,
+      _id: avatarId,
     });
 
-    return { ...data, images: filteredMetaData };
+    let images = undefined;
+    if (needImg) {
+      images = await this.imageService.getImagesByParams({
+        ownerId: data._id,
+      });
+    }
+
+    return { ...data, avatar: avatar[0], images };
   }
 
-  async getOneUserByParamsWithPassword(filterQuery: Partial<User>) {
-    const excepted = { isActive: 0 };
-    return this.userRepository.findOne(filterQuery, excepted);
+  async getUsersByParamsWithPassword(filterQuery: Partial<User>) {
+    return this.userRepository.find(filterQuery);
   }
 
-  async softDelete(_id: string) {
+  async softDeleteUser(_id: string) {
     return this.userRepository.upsert({ _id }, { isActive: false });
   }
 
@@ -95,67 +98,35 @@ export class UserService {
     return this.userRepository.findOneAndUpdate(filterQuery, updatedEntityData);
   }
 
-  async addImage(imageData: string, user: User) {
-    const formatMatch = imageData.match(dataURLRegex);
+  async addImage(file: Express.Multer.File, user: User) {
+    const images = await this.imageService.getImagesByParams({
+      ownerId: user._id,
+    });
 
-    if (!formatMatch) {
-      throw new BadRequestException('Invalid formats of file');
-    }
-
-    const publicFolder = this.configService.get<string>('PUBLIC_FOLDER');
-    const buffer = Buffer.from(imageData.replace(base64Regex, ''), 'base64');
-    const folderName = path.join(__dirname, '..', '..', publicFolder);
-    const imageName = `${new Types.ObjectId()}.${formatMatch[1]}`;
-    const fullImagePath = path.join(folderName, imageName);
-
-    if (!fs.existsSync(folderName)) {
-      fs.mkdirSync(folderName, { recursive: true });
-    }
-
-    await asyncWriteFile(fullImagePath, buffer);
-
-    const currentImage = {
-      imagePath: imageName,
-      isActive: true,
-      isAvatar: user.images === undefined,
-    };
-
-    const images = user.images
-      ? [...user.images, currentImage]
-      : [currentImage];
-
-    try {
-      await this.userRepository.findOneAndUpdate({ _id: user._id }, { images });
-    } catch (error) {
-      asyncUnlink(fullImagePath);
-
-      throw new InternalServerErrorException(error.message);
+    const newImage = await this.imageService.addImage(file, {
+      ownerId: user._id,
+    });
+    if (images.length === 0) {
+      await this.userRepository.findOneAndUpdate(
+        { _id: user._id },
+        { avatarId: newImage._id }
+      );
     }
   }
 
-  async setAvatar(imageName: string, user: User) {
-    const images = user.images?.map((item) => {
-      if (item.imagePath === imageName) {
-        item.isAvatar = true;
-      } else {
-        item.isAvatar = false;
-      }
-
-      return item;
+  async setAvatar(imageId: string, user: User) {
+    await this.imageService.getOneImageByParams({
+      _id: imageId,
+      ownerId: user._id,
     });
 
-    await this.userRepository.findOneAndUpdate({ _id: user._id }, { images });
+    await this.userRepository.findOneAndUpdate(
+      { _id: user._id },
+      { avatarId: imageId }
+    );
   }
 
-  async softDeleteImage(imageName: string, user: User) {
-    const images = user.images?.map((item) => {
-      if (item.imagePath === imageName) {
-        item.isActive = false;
-      }
-
-      return item;
-    });
-
-    await this.userRepository.findOneAndUpdate({ _id: user._id }, { images });
+  async deleteImage(imageId: string, user: User) {
+    return this.imageService.softDeleteImage(imageId, user);
   }
 }

@@ -9,8 +9,8 @@ import {
 import { AuthService } from './auth.service';
 import { ConfirmDto, RefreshDto, SignDto } from './dto';
 import { LocalAuthGuard } from './guards';
-import { MongoIdDto } from 'src/user/dto';
 import { CurrentUser } from 'src/auth/decorators';
+import { MongoIdDto } from 'src/dto';
 import { User } from 'src/user/user.schema';
 
 @Controller('auth')

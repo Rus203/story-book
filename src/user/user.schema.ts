@@ -1,7 +1,6 @@
 import { Schema, Prop, SchemaFactory } from '@nestjs/mongoose';
 import { AbstractDocument } from 'src/database';
 import { GENDER, SEXUAL_ORIENTATION, SHOWN_GENDER } from 'src/enums';
-import { IImage } from 'src/interface';
 
 @Schema({ versionKey: false })
 export class User extends AbstractDocument {
@@ -30,7 +29,7 @@ export class User extends AbstractDocument {
   };
 
   @Prop()
-  birthDate?: Date;
+  birthDate?: string;
 
   @Prop()
   phoneVerified: boolean;
@@ -41,8 +40,8 @@ export class User extends AbstractDocument {
   @Prop()
   refreshToken?: string;
 
-  @Prop({ default: [] })
-  images?: IImage[];
+  @Prop()
+  avatarId?: string;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

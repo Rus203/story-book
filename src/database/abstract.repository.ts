@@ -1,6 +1,5 @@
 import { AbstractDocument } from './abstract.entity';
 import {
-  ClientSession,
   Connection,
   FilterQuery,
   Model,
@@ -11,7 +10,7 @@ import {
 import { ConflictException, Logger, NotFoundException } from '@nestjs/common';
 
 export abstract class AbstractRepository<TDocument extends AbstractDocument> {
-  protected readonly logger: Logger;
+  protected abstract readonly logger: Logger;
   constructor(
     private readonly model: Model<TDocument>,
     private readonly connection: Connection
@@ -24,6 +23,7 @@ export abstract class AbstractRepository<TDocument extends AbstractDocument> {
     const newDocument = new this.model({
       ...document,
       _id: new Types.ObjectId(),
+      isActive: true,
     });
     return (await newDocument.save(options)).toJSON() as TDocument;
   }
@@ -32,16 +32,33 @@ export abstract class AbstractRepository<TDocument extends AbstractDocument> {
     entityFilterQuery: FilterQuery<TDocument>,
     projection?: Record<string, unknown>
   ) {
-    return this.model.find(entityFilterQuery, projection ?? {}, { lean: true });
+    return this.model.find(
+      { ...entityFilterQuery, isActive: true },
+      { ...projection, isActive: false },
+      { lean: true }
+    );
   }
 
   async findOne(
     entityFilterQuery: FilterQuery<TDocument>,
-    projection?: Record<string, unknown>
+    projection?: Record<string, unknown>,
+    populateField?: string
   ) {
-    const document = await this.model.findOne(entityFilterQuery, projection, {
-      lean: true,
-    });
+    const document = populateField
+      ? await this.model
+          .findOne(
+            { ...entityFilterQuery, isActive: true },
+            { ...projection, isActive: false },
+            {
+              lean: true,
+            }
+          )
+          .populate(populateField)
+      : await this.model.findOne(
+          entityFilterQuery,
+          { ...projection, isActive: false },
+          { lean: true }
+        );
 
     if (!document) {
       this.logger.warn('Document not found with filterQuery');
@@ -56,7 +73,7 @@ export abstract class AbstractRepository<TDocument extends AbstractDocument> {
     updatedData: UpdateQuery<TDocument>
   ) {
     const document = await this.model.findOneAndUpdate(
-      entityFilterQuery,
+      { ...entityFilterQuery, isActive: true },
       updatedData,
       { lean: true, new: true }
     );
@@ -81,11 +98,5 @@ export abstract class AbstractRepository<TDocument extends AbstractDocument> {
       lean: true,
       upsert: true,
     });
-  }
-
-  async startTransaction(): Promise<ClientSession> {
-    const session = await this.connection.startSession();
-    session.startTransaction();
-    return session;
   }
 }

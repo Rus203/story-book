@@ -6,6 +6,8 @@ import { ConfigModule } from '@nestjs/config';
 import { PassportModule } from '@nestjs/passport';
 import { JwtStrategy, LocalStrategy } from './strategies';
 import { UserModule } from 'src/user/user.module';
+import { ImageService } from 'src/image/image.service';
+import { ImageModule } from 'src/image/image.module';
 
 @Module({
   controllers: [AuthController],
@@ -15,6 +17,7 @@ import { UserModule } from 'src/user/user.module';
     UserModule,
     JwtModule.register({}),
     PassportModule.register({ defaultStrategy: 'jwt' }),
+    ImageModule,
   ],
 })
 export class AuthModule {}

@@ -10,18 +10,22 @@ import * as bcrypt from 'bcryptjs';
 import { JwtService } from '@nestjs/jwt';
 import { UserService } from 'src/user/user.service';
 import { User } from 'src/user/user.schema';
+import { ImageService } from 'src/image/image.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     private userService: UserService,
     private configService: ConfigService,
-    private jwtService: JwtService
+    private jwtService: JwtService,
+    private imageService: ImageService
   ) {}
 
   async signUp(data: SignDto) {
     const { phoneNumber, password } = data;
-    const existingUsers = await this.userService.getUsers({ phoneNumber });
+    const existingUsers = await this.userService.getUsersByParams({
+      phoneNumber,
+    });
 
     if (existingUsers.length > 0) {
       throw new ConflictException('The phone number has already busy');
@@ -32,18 +36,30 @@ export class AuthService {
 
   async signIn(user: User) {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password, isActive, refreshToken, _id, ...other } = user;
+    const { password, isActive, refreshToken, avatarId, ...other } = user;
     const tokens = {
-      accessToken: await this.generateAccessToken({ _id }),
-      refreshToken: await this.generateRefreshToken({ _id }),
+      accessToken: await this.generateAccessToken({ _id: other._id }),
+      refreshToken: await this.generateRefreshToken({ _id: other._id }),
     };
 
     await this.userService.recordField(
-      { _id: user._id },
+      { _id: other._id },
       { refreshToken: tokens.refreshToken }
     );
 
-    return { tokens, ...other };
+    const images = await this.imageService.getImagesByParams({
+      ownerId: other._id,
+    });
+
+    const avatar = images.reduce((acc, item) => {
+      if (item._id.toString() === avatarId.toString()) {
+        acc = item;
+      }
+
+      return acc;
+    }, undefined);
+
+    return { tokens, avatar, images, ...other };
   }
 
   async refresh(_id: string, refreshToken: string) {
@@ -75,16 +91,16 @@ export class AuthService {
   }
 
   async validate(phoneNumber: string, password: string) {
-    const user = await this.userService.getOneUserByParamsWithPassword({
+    const user = await this.userService.getUsersByParamsWithPassword({
       phoneNumber,
     });
 
-    if (!user) {
+    if (user.length === 0) {
       return null;
     }
 
-    const passwordIsValid = await bcrypt.compare(password, user.password);
-    return passwordIsValid ? user : null;
+    const passwordIsValid = await bcrypt.compare(password, user[0].password);
+    return passwordIsValid ? user[0] : null;
   }
 
   async generateAccessToken(payload: any) {

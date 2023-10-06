@@ -14,7 +14,7 @@ export class LocalStrategy extends PassportStrategy(Strategy) {
     const user = await this.authService.validate(phoneNumber, password);
 
     if (!user) {
-      throw new UnauthorizedException();
+      throw new UnauthorizedException('Incorrect phone number or password');
     }
 
     return user;

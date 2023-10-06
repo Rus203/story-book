@@ -6,22 +6,24 @@ import {
   Param,
   Patch,
   Query,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import {
   UpdateBirthDateDto,
   UpdateEmailDto,
   UpdateNickNameDto,
-  MongoIdDto,
-  ImageDto,
-  CreateImageDto,
   PersonalInfoDto,
 } from './dto';
 import { JwtAuthGuard } from 'src/auth/guards';
-import { OwnerGuard } from './guard/owner.guard';
 import { CurrentUser } from 'src/auth/decorators';
+import { ImageIdDto, MongoIdDto } from 'src/dto';
 import { User } from './user.schema';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { FileFormatPipe } from '../pipe';
+import * as multer from 'multer';
 
 @Controller('user')
 @UseGuards(JwtAuthGuard)
@@ -29,65 +31,63 @@ export class UserController {
   constructor(private userService: UserService) {}
 
   @Get('/')
-  async getUsers(@Query() data: Partial<User>, @CurrentUser() user: User) {
-    console.log('user: ', user);
-    return this.userService.getUsers(data);
+  async getUsers(@Query() data: Partial<User>) {
+    return this.userService.getUsersByParams(data, true);
   }
 
-  @Get(':_id')
-  async getUserById(@Param() data: MongoIdDto) {
-    return this.userService.getOneUserByParams({ _id: data._id });
-  }
-
-  @UseGuards(OwnerGuard)
-  @Delete(':_id')
-  async deleteUserById(@Param() data: MongoIdDto) {
-    await this.userService.softDelete(data._id);
-  }
-
-  @UseGuards(OwnerGuard)
-  @Patch(':_id/email')
+  @Patch('email')
   async addEmailToUser(
-    @Param() data: MongoIdDto,
-    @Body() body: UpdateEmailDto
+    @Body() body: UpdateEmailDto,
+    @CurrentUser() user: User
   ) {
-    const filterQuery = { _id: data._id, email: undefined };
+    const filterQuery = { email: undefined, _id: user._id };
     await this.userService.recordField(filterQuery, { email: body.email });
   }
 
-  @UseGuards(OwnerGuard)
-  @Patch(':_id/nickName')
+  @Patch('nick-name')
   async addNickToUser(
-    @Param() data: MongoIdDto,
-    @Body() body: UpdateNickNameDto
+    @Body() body: UpdateNickNameDto,
+    @CurrentUser() user: User
   ) {
-    const filterQuery = { _id: data._id, nickName: undefined };
-    await this.userService.recordField(filterQuery, { email: body.nickName });
+    const filterQuery = { nickName: undefined, _id: user._id };
+    await this.userService.recordField(filterQuery, {
+      nickName: body.nickName,
+    });
   }
 
-  @UseGuards(OwnerGuard)
-  @Patch(':_id/birthdate')
+  @Patch('birthdate')
   async addBirthDate(
-    @Param() data: MongoIdDto,
-    @Body() body: UpdateBirthDateDto
+    @Body() body: UpdateBirthDateDto,
+    @CurrentUser() user: User
   ) {
-    await this.userService.recordField({ _id: data._id }, body.birthDate);
+    await this.userService.recordField(
+      { _id: user._id.toString() },
+      { birthDate: body.birthDate }
+    );
   }
 
-  @UseGuards(OwnerGuard)
-  @Patch(':_id/image')
-  async addImage(@Body() body: CreateImageDto, @CurrentUser() user: User) {
-    await this.userService.addImage(body.imageData, user);
+  @Patch('image')
+  @UseInterceptors(
+    FileInterceptor('imageData', { storage: multer.memoryStorage() })
+  )
+  async addImage(
+    @CurrentUser() user: User,
+    @UploadedFile(new FileFormatPipe()) file: Express.Multer.File
+  ) {
+    await this.userService.addImage(file, user);
   }
 
-  @UseGuards(OwnerGuard)
-  @Patch(':_id/set-avatar')
-  async setAvatar(@Body() body: ImageDto, @CurrentUser() user: User) {
-    await this.userService.setAvatar(body.imagePath, user);
+  @Patch('set-avatar')
+  async setAvatar(@Body() body: ImageIdDto, @CurrentUser() user: User) {
+    await this.userService.setAvatar(body.imageId, user);
   }
 
-  @UseGuards(OwnerGuard)
-  @Patch(':_id/personal-info')
+  @Delete('image')
+  async deleteImage(@Body() body: ImageIdDto, @CurrentUser() user: User) {
+    await this.userService.deleteImage(body.imageId, user);
+  }
+
+  @Patch('personal-info')
   async setPersonal(@Body() body: PersonalInfoDto, @CurrentUser() user: User) {
     const { gender, sexualOrientation, shownGender } = body;
 
@@ -105,13 +105,13 @@ export class UserController {
     await this.userService.recordField({ _id: user._id }, updatedEntityData);
   }
 
-  @UseGuards(OwnerGuard)
-  @Delete(':_id/image')
-  async deleteImage(
-    @Param() data: MongoIdDto,
-    @Body() body: ImageDto,
-    @CurrentUser() user: User
-  ) {
-    await this.userService.softDeleteImage(body.imagePath, user);
+  @Get(':_id')
+  async getUser(@Param() data: MongoIdDto) {
+    return this.userService.getOneUserByParams({ _id: data._id }, {}, true);
+  }
+
+  @Delete(':_id')
+  async deleteUser(@Param() data: MongoIdDto) {
+    await this.userService.softDeleteUser(data._id);
   }
 }
