@@ -27,7 +27,7 @@ export class PlaceService {
     const { ownerId, avatarId, ...data } =
       await this.placeRepository.findOne(filterQuery);
 
-    const owner = await this.userService.getOneUserByParams(
+    const owner = await this.userService.getAllUsersByParams(
       {
         _id: ownerId,
       },
@@ -39,6 +39,8 @@ export class PlaceService {
         birthDate: false,
         phoneNumber: false,
         email: false,
+        password: false,
+        refreshToken: false,
       }
     );
 
@@ -54,7 +56,7 @@ export class PlaceService {
       return acc;
     }, undefined);
 
-    return { ...data, owner, images, avatar };
+    return { ...data, owner: owner[0], images, avatar };
   }
 
   async getPlacesByParams(entityFilterQuery: FilterQuery<Place>) {
@@ -72,7 +74,7 @@ export class PlaceService {
       places.map(async (place) => {
         const { ownerId, avatarId, ...data } = place;
 
-        const owner = await this.userService.getOneUserByParams(
+        const owner = await this.userService.getAllUsersByParams(
           {
             _id: ownerId,
           },
@@ -84,6 +86,8 @@ export class PlaceService {
             birthDate: false,
             phoneNumber: false,
             email: false,
+            password: false,
+            refreshToken: false,
           }
         );
 
@@ -99,7 +103,7 @@ export class PlaceService {
           return acc;
         }, undefined);
 
-        return { ...data, owner, images, avatar };
+        return { ...data, owner: owner[0], images, avatar };
       })
     );
   }
@@ -135,6 +139,10 @@ export class PlaceService {
         { avatarId: newImage._id }
       );
     }
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { isActive, ...data } = newImage;
+    return data;
   }
 
   async setAvatar(placeId: string, imageId: string, user: User) {
@@ -155,6 +163,11 @@ export class PlaceService {
       placeId,
     });
 
-    await this.imageService.softDeleteImage(imageId, user);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { isActive, ...data } = await this.imageService.softDeleteImage(
+      imageId,
+      user
+    );
+    return data;
   }
 }

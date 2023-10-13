@@ -1,5 +1,6 @@
 import {
   Body,
+  ConflictException,
   Controller,
   Delete,
   Get,
@@ -32,7 +33,7 @@ export class UserController {
 
   @Get('/')
   async getUsers(@Query() data: Partial<User>) {
-    return this.userService.getUsersByParams(data, true);
+    return this.userService.getUsersByParams(data, {}, true);
   }
 
   @Patch('email')
@@ -40,8 +41,17 @@ export class UserController {
     @Body() body: UpdateEmailDto,
     @CurrentUser() user: User
   ) {
-    const filterQuery = { email: undefined, _id: user._id };
-    await this.userService.recordField(filterQuery, { email: body.email });
+    const users = await this.userService.getUsersByParams({
+      email: body.email,
+    });
+
+    if (users.length !== 0) {
+      throw new ConflictException('This email has already busy');
+    }
+    await this.userService.recordField(
+      { _id: user._id },
+      { email: body.email }
+    );
   }
 
   @Patch('nick-name')
@@ -49,10 +59,18 @@ export class UserController {
     @Body() body: UpdateNickNameDto,
     @CurrentUser() user: User
   ) {
-    const filterQuery = { nickName: undefined, _id: user._id };
-    await this.userService.recordField(filterQuery, {
+    const users = await this.userService.getUsersByParams({
       nickName: body.nickName,
     });
+
+    if (users.length !== 0) {
+      throw new ConflictException('This nick has already busy');
+    }
+
+    await this.userService.recordField(
+      { _id: user._id },
+      { nickName: body.nickName }
+    );
   }
 
   @Patch('birthdate')
@@ -74,7 +92,7 @@ export class UserController {
     @CurrentUser() user: User,
     @UploadedFile(new FileFormatPipe()) file: Express.Multer.File
   ) {
-    await this.userService.addImage(file, user);
+    return this.userService.addImage(file, user);
   }
 
   @Patch('set-avatar')
@@ -84,7 +102,7 @@ export class UserController {
 
   @Delete('image')
   async deleteImage(@Body() body: ImageIdDto, @CurrentUser() user: User) {
-    await this.userService.deleteImage(body.imageId, user);
+    return this.userService.deleteImage(body.imageId, user);
   }
 
   @Patch('personal-info')

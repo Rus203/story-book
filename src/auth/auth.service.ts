@@ -51,15 +51,7 @@ export class AuthService {
       ownerId: other._id,
     });
 
-    const avatar = images.reduce((acc, item) => {
-      if (item._id.toString() === avatarId.toString()) {
-        acc = item;
-      }
-
-      return acc;
-    }, undefined);
-
-    return { tokens, avatar, images, ...other };
+    return { tokens, images, ...other };
   }
 
   async refresh(_id: string, refreshToken: string) {
@@ -91,7 +83,8 @@ export class AuthService {
   }
 
   async validate(phoneNumber: string, password: string) {
-    const user = await this.userService.getUsersByParamsWithPassword({
+    const user = await this.userService.getAllUsersByParams({
+      isActive: true,
       phoneNumber,
     });
 

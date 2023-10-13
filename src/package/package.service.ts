@@ -40,10 +40,8 @@ export class PackageService {
       packageId: data._id,
     });
 
-    const owner = await this.userService.getOneUserByParams(
-      {
-        _id: ownerId,
-      },
+    const owner = await this.userService.getAllUsersByParams(
+      { _id: ownerId },
       {
         gender: false,
         sexualOrientation: false,
@@ -52,6 +50,8 @@ export class PackageService {
         birthDate: false,
         phoneNumber: false,
         email: false,
+        password: false,
+        refreshToken: false,
       }
     );
 
@@ -63,7 +63,7 @@ export class PackageService {
       return acc;
     }, undefined);
 
-    return { ...data, owner, images, avatar };
+    return { ...data, owner: owner[0], images, avatar };
   }
 
   async getPackagesByParams(entityFilterQuery: FilterQuery<Package>) {
@@ -94,10 +94,8 @@ export class PackageService {
       packages.map(async (pack) => {
         const { ownerId, ...data } = pack;
 
-        const owner = await this.userService.getOneUserByParams(
-          {
-            _id: ownerId,
-          },
+        const owner = await this.userService.getAllUsersByParams(
+          { _id: ownerId },
           {
             gender: false,
             sexualOrientation: false,
@@ -106,9 +104,10 @@ export class PackageService {
             birthDate: false,
             phoneNumber: false,
             email: false,
+            password: false,
+            refreshToken: false,
           }
         );
-
         const images = await this.imageService.getImagesByParams({
           packageId: pack._id,
         });
@@ -123,7 +122,7 @@ export class PackageService {
 
         delete data.avatarId;
 
-        return { ...data, owner, images, avatar };
+        return { ...data, owner: owner[0], images, avatar };
       })
     );
   }
@@ -178,12 +177,21 @@ export class PackageService {
         { avatarId: newImage._id }
       );
     }
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { isActive, ...data } = newImage;
+    return data;
   }
 
   async softDeleteImagePackage(packageId: string, imageId: string, user: User) {
     await this.imageService.getOneImageByParams({ _id: imageId, packageId });
 
-    await this.imageService.softDeleteImage(imageId, user);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { isActive, ...data } = await this.imageService.softDeleteImage(
+      imageId,
+      user
+    );
+    return data;
   }
 
   async setPackageAvatar(packageId: string, imageId: string, user: User) {

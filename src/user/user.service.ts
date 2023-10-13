@@ -16,17 +16,22 @@ export class UserService {
 
   async addUser(phoneNumber: string, password: string) {
     const hashedPassword = await bcrypt.hash(password, 10);
-    return this.userRepository.create({
+    await this.userRepository.create({
       phoneNumber,
       password: hashedPassword,
       phoneVerified: false,
     });
   }
 
-  async getUsersByParams(filterQuery?: FilterQuery<User>, needImg = false) {
+  async getUsersByParams(
+    filterQuery?: FilterQuery<User>,
+    projection?: Record<string, unknown>,
+    needImg = false
+  ) {
     const excepted = {
       password: false,
       refreshToken: false,
+      ...projection,
     };
 
     const users = await this.userRepository.find(filterQuery, excepted);
@@ -42,7 +47,6 @@ export class UserService {
         let images = undefined;
 
         if (needImg) {
-          console.log('add img');
           images = await this.imageService.getImagesByParams({
             ownerId: data._id,
           });
@@ -83,8 +87,23 @@ export class UserService {
     return { ...data, avatar: avatar[0], images };
   }
 
-  async getUsersByParamsWithPassword(filterQuery: Partial<User>) {
-    return this.userRepository.find(filterQuery);
+  async getAllUsersByParams(
+    filterQuery: Partial<User>,
+    projection?: Record<string, unknown>
+  ) {
+    const users = await this.userRepository.findAll(filterQuery, projection);
+
+    return Promise.all(
+      users.map(async (user) => {
+        const { avatarId, ...data } = user;
+        const avatar = await this.imageService.getImagesByParams({
+          ownerId: data._id,
+          _id: avatarId,
+        });
+
+        return { ...data, avatar: avatar[0] };
+      })
+    );
   }
 
   async softDeleteUser(_id: string) {
@@ -106,12 +125,17 @@ export class UserService {
     const newImage = await this.imageService.addImage(file, {
       ownerId: user._id,
     });
+
     if (images.length === 0) {
       await this.userRepository.findOneAndUpdate(
         { _id: user._id },
         { avatarId: newImage._id }
       );
     }
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { isActive, ...data } = newImage;
+    return data;
   }
 
   async setAvatar(imageId: string, user: User) {
@@ -127,6 +151,11 @@ export class UserService {
   }
 
   async deleteImage(imageId: string, user: User) {
-    return this.imageService.softDeleteImage(imageId, user);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { isActive, ...data } = await this.imageService.softDeleteImage(
+      imageId,
+      user
+    );
+    return data;
   }
 }

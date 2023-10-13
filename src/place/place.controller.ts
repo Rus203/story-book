@@ -67,7 +67,7 @@ export class PlaceController {
     @UploadedFile(new FileFormatPipe()) file: Express.Multer.File,
     @CurrentUser() user: User
   ) {
-    await this.placeService.addImage(data._id, file, user);
+    return this.placeService.addImage(data._id, file, user);
   }
 
   @Patch(':_id/set-avatar')

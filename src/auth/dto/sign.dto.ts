@@ -5,6 +5,6 @@ export class SignDto {
   password: string;
 
   @IsNotEmpty()
-  @IsPhoneNumber()
+  // @IsPhoneNumber()
   phoneNumber: string;
 }

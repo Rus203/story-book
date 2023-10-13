@@ -32,14 +32,14 @@ export class PackageController {
     return this.packageService.getPackagesByParams(data);
   }
 
-  @Get(':_id')
-  async getPackage(@Param() data: MongoIdDto) {
-    return this.packageService.getOnePackageByParams({ _id: data._id });
-  }
-
   @Post('/')
   async addPackage(@Body() body: CreatePackageDto, @CurrentUser() owner: User) {
     await this.packageService.addPackage(body, owner);
+  }
+
+  @Get(':_id')
+  async getPackage(@Param() data: MongoIdDto) {
+    return this.packageService.getOnePackageByParams({ _id: data._id });
   }
 
   @Delete(':_id')

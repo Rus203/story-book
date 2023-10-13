@@ -59,7 +59,7 @@ export class ImageService {
   }
 
   async softDeleteImage(imageId: string, user: User) {
-    await this.imageRepository.findOneAndUpdate(
+    return this.imageRepository.findOneAndUpdate(
       { _id: imageId, ownerId: user._id },
       { isActive: false }
     );

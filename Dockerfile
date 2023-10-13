@@ -8,6 +8,7 @@ RUN yarn
 
 RUN yarn build
 
+
 EXPOSE 3000
 
 
@@ -17,6 +18,6 @@ ARG NODE_ENV=production
 
 ENV NODE_ENV=${NODE_ENV}
 
-COPY --from=development app/dist ./dist
+RUN yarn build
 
 CMD ["node", "dist/main"]

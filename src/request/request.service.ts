@@ -83,7 +83,7 @@ export class RequestService {
     return Promise.all(
       requests.map(async (request) => {
         const { userId, ...data } = request;
-        const user = await this.userService.getOneUserByParams(
+        const user = await this.userService.getAllUsersByParams(
           { _id: userId },
           {
             gender: false,
@@ -93,9 +93,11 @@ export class RequestService {
             birthDate: false,
             phoneNumber: false,
             email: false,
+            password: false,
+            refreshToken: false,
           }
         );
-        return { ...data, user };
+        return { ...data, user: user[0] };
       })
     );
   }
@@ -104,7 +106,7 @@ export class RequestService {
     const { userId, ...data } =
       await this.requestRepository.findOne(filterQuery);
 
-    const user = await this.userService.getOneUserByParams(
+    const user = await this.userService.getAllUsersByParams(
       { _id: userId },
       {
         gender: false,
@@ -114,10 +116,12 @@ export class RequestService {
         birthDate: false,
         phoneNumber: false,
         email: false,
+        password: false,
+        refreshToken: false,
       }
     );
 
-    return { ...data, user };
+    return { ...data, user: user[0] };
   }
 
   async takeDecisionRequest(
@@ -126,28 +130,20 @@ export class RequestService {
     decision: REQUEST_STATUS,
     owner: User
   ) {
-    console.log(1);
-
     const { guestMenCount, guestWomenCount, guestOthersCount } =
       await this.postService.getOnePostByParams({
         _id: postId,
         ownerId: owner._id,
       });
 
-    console.log(2);
-
     const request = await this.requestRepository.findOne({
       postId,
       _id: requestId,
     });
 
-    console.log(3);
-
     const user = await this.userService.getOneUserByParams({
       _id: request.userId,
     });
-
-    console.log(4);
 
     const {
       participants,
@@ -156,8 +152,6 @@ export class RequestService {
       currentGuestOthersCount,
       currentGuestWomenCount,
     } = await this.memberService.findOneGroupByParams({ postId });
-
-    console.log(5);
 
     if (request.requestStatus !== REQUEST_STATUS.NEW) {
       throw new ForbiddenException('Forbidden');

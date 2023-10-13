@@ -45,7 +45,7 @@ export class PostService {
   async getOnePostByParams(filterQuery: FilterQuery<Post>) {
     const { ownerId, ...data } = await this.postRepository.findOne(filterQuery);
 
-    const owner = await this.userService.getOneUserByParams(
+    const owner = await this.userService.getAllUsersByParams(
       { _id: ownerId },
       {
         gender: false,
@@ -55,6 +55,8 @@ export class PostService {
         birthDate: false,
         phoneNumber: false,
         email: false,
+        password: false,
+        refreshToken: false,
       }
     );
 
@@ -67,8 +69,8 @@ export class PostService {
     });
 
     const members = await Promise.all(
-      participants.map((userId) =>
-        this.userService.getOneUserByParams(
+      participants.map(async (userId) => {
+        const user = await this.userService.getAllUsersByParams(
           { _id: userId },
           {
             gender: false,
@@ -78,12 +80,16 @@ export class PostService {
             birthDate: false,
             phoneNumber: false,
             email: false,
+            password: false,
+            refreshToken: false,
           }
-        )
-      )
+        );
+
+        return user[0];
+      })
     );
 
-    return { ...data, members, owner, images: packageImages };
+    return { ...data, members, owner: owner[0], images: packageImages };
   }
 
   async getPostsByParams(entityFilterQuery: FilterQuery<Post>) {
@@ -108,8 +114,8 @@ export class PostService {
         });
 
         const members = await Promise.all(
-          participants.map((userId) =>
-            this.userService.getOneUserByParams(
+          participants.map(async (userId) => {
+            const user = await this.userService.getAllUsersByParams(
               { _id: userId },
               {
                 gender: false,
@@ -119,15 +125,16 @@ export class PostService {
                 birthDate: false,
                 phoneNumber: false,
                 email: false,
+                password: false,
+                refreshToken: false,
               }
-            )
-          )
+            );
+            return user[0];
+          })
         );
 
-        const owner = await this.userService.getOneUserByParams(
-          {
-            _id: ownerId,
-          },
+        const owner = await this.userService.getAllUsersByParams(
+          { _id: ownerId },
           {
             gender: false,
             sexualOrientation: false,
@@ -136,6 +143,8 @@ export class PostService {
             birthDate: false,
             phoneNumber: false,
             email: false,
+            password: false,
+            refreshToken: false,
           }
         );
 
@@ -143,7 +152,7 @@ export class PostService {
           packageId: data.packageId,
         });
 
-        return { ...data, owner, images, members };
+        return { ...data, owner: owner[0], images, members };
       })
     );
   }

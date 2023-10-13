@@ -33,7 +33,23 @@ export abstract class AbstractRepository<TDocument extends AbstractDocument> {
     projection?: Record<string, unknown>
   ) {
     return this.model.find(
-      { ...entityFilterQuery, isActive: true },
+      {
+        isActive: true,
+        ...entityFilterQuery,
+      },
+      { ...projection, isActive: false },
+      { lean: true }
+    );
+  }
+
+  async findAll(
+    entityFilterQuery: FilterQuery<TDocument>,
+    projection?: Record<string, unknown>
+  ) {
+    return this.model.find(
+      {
+        ...entityFilterQuery,
+      },
       { ...projection, isActive: false },
       { lean: true }
     );
@@ -47,7 +63,7 @@ export abstract class AbstractRepository<TDocument extends AbstractDocument> {
     const document = populateField
       ? await this.model
           .findOne(
-            { ...entityFilterQuery, isActive: true },
+            { isActive: true, ...entityFilterQuery },
             { ...projection, isActive: false },
             {
               lean: true,
@@ -55,7 +71,7 @@ export abstract class AbstractRepository<TDocument extends AbstractDocument> {
           )
           .populate(populateField)
       : await this.model.findOne(
-          entityFilterQuery,
+          { isActive: true, ...entityFilterQuery },
           { ...projection, isActive: false },
           { lean: true }
         );
@@ -73,7 +89,7 @@ export abstract class AbstractRepository<TDocument extends AbstractDocument> {
     updatedData: UpdateQuery<TDocument>
   ) {
     const document = await this.model.findOneAndUpdate(
-      { ...entityFilterQuery, isActive: true },
+      { isActive: true, ...entityFilterQuery },
       updatedData,
       { lean: true, new: true }
     );
